@@ -1,30 +1,52 @@
 import numpy as np
 
-class entity():
+class Entity():
     def __init__(self):
         self.size_r = 0.
-        self.position_x = 0.
-        self.position_y = 0.
-        self.orientation = 0.
+        self.current_position_x = 0.
+        self.current_position_y = 0.
+        self.current_orientation = 0.
 
-    def set_position(self, x, y, theta):
-        self.position_x = x
-        self.position_y = y
-        self.orientation = theta
+    def set_current_position(self, x, y, theta):
+        self.current_position_x = x
+        self.current_position_y = y
+        self.current_orientation = theta
 
-    def show_parameters(self):
-        return "size_r:{}, position_x:{}, position_y:{}, orientation:{}".format(
-                self.size_r, self.position_x, self.position_y, self.orientation)
+    def show_current_parameters(self):
+        return "size_r:{}, current_position_x:{}, current_position_y:{}, current_orientation:{}".format(
+                self.size_r, self.current_position_x, self.current_position_y, self.current_orientation)
 
-class robot(entity):
+    def get_current_position(self):
+        return self.current_position_x, self.current_position_y, self.current_orientation
+
+    def get_current_parameter_xy(self):
+        return self.current_position_x, self.current_position_y
+
+class Robot(Entity):
     def __init__(self):
         super().__init__()
-        self.size_r = 10. * 1000
+        self.size_r = 90.
+        self.front_degree = 11.86 * 2
+        self.max_velocity = 0.1 #mm/s
+        self.future_position_x = 0.
+        self.future_position_y = 0.
+        self.future_orientation = 0.
 
-class ball(entity):
+    def set_future_position(self, x, y, theta):
+        self.future_position_x = x
+        self.future_position_y = y
+        self.future_orientation = theta
+
+    def get_future_position(self):
+        return self.future_position_x, self.future_position_y, self.future_orientation
+
+    def get_future_parameter_xy(self):
+        return self.future_position_x, self.future_position_y
+
+class Ball(Entity):
     def __init__(self):
         super().__init__()
-        self.size_r = 21.33
+        self.size_r = 21.5
 
 
 
