@@ -13,8 +13,8 @@ class PositionFigure():
     def set_sub_plot(self):
         self.iter += 1
         plt.subplot(self.row_num, self.column_num, self.iter)
-        plt.xlim(-4.5, 4.5)
-        plt.ylim(-3., 3.)
+        plt.xlim(-7.5, 7.5)
+        plt.ylim(-4.5, 4.5)
 
     def set_robot_plot(self,x,y,z):
         x_ = math.cos(math.asin(z))

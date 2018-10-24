@@ -1,11 +1,17 @@
 import numpy as np
+import random
 
 class Entity():
     def __init__(self):
+        self.field_x_size = 12000
+        self.field_y_size = 9000
         self.size_r = 0.
         self.current_position_x = 0.
         self.current_position_y = 0.
+        #self.current_position_x = random.uniform(-self.field_x_size/2, self.field_x_size/2)
+        #self.current_position_y = random.uniform(-self.field_y_size/2, self.field_y_size/2)
         self.current_orientation = 0.
+
 
     def set_current_position(self, x, y, theta):
         self.current_position_x = x
@@ -31,6 +37,7 @@ class Robot(Entity):
         self.future_position_x = 0.
         self.future_position_y = 0.
         self.future_orientation = 0.
+        self.has_a_ball = False
 
     def set_future_position(self, x, y, theta):
         self.future_position_x = x
