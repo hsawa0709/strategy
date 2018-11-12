@@ -3,8 +3,8 @@ import random
 
 class Entity():
     def __init__(self):
-        self.field_x_size = 12000
-        self.field_y_size = 9000
+        self.field_x_size = 12000.
+        self.field_y_size = 9000.
         self.size_r = 0.
         self.current_position_x = 0.
         self.current_position_y = 0.
@@ -33,7 +33,7 @@ class Robot(Entity):
         super().__init__()
         self.size_r = 90.
         self.front_degree = 11.86 * 2
-        self.max_velocity = 0.1 #mm/s
+        self.max_velocity = 1000. #mm/s
         self.future_position_x = 0.
         self.future_position_y = 0.
         self.future_orientation = 0.

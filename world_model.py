@@ -14,18 +14,29 @@ from sklearn.cluster import KMeans
 """
 
 class WorldModel():
-    def __init__(self, robot_num):
+    def __init__(self, robot_num, enemy_num):
         self.robot_num = robot_num
+        self.enemy_num = enemy_num
         self.robot = [entity.Robot() for i in range(robot_num)]
-        self.enemy = [entity.Robot() for i in range(robot_num)]
+        self.enemy = [entity.Robot() for i in range(enemy_num)]
         self.ball = entity.Ball()
-        self.rate = 100 #ms
+        self.field_x_size = 12000.
+        self.field_y_size = 9000.
+
+        self.rate = 0.1 #s
+
         self.strategy = None
-        self.field_x_size = 12000
-        self.field_y_size = 9000
+
         self.referee = None
+
         self.which_has_a_ball = None
         self.attack_or_deffence = None
+
+        # weight for potential
+        self.weight_enemy = 1.0
+        self.weight_goal = 5.0
+        self.delta = 0.1
+        self.speed = self.robot[0].max_velocity
 
     def get_information_from_vision(self, x):
         self.robot[0].set_current_position(x=-3000., y=0., theta=0.)
@@ -163,7 +174,7 @@ class WorldModel():
 
     def robot_enemy_move_all_linear(self, time=0, time_steps=10):
         difference = np.array([[0.,0.,0.] for i in range(self.robot_num)])
-        difference_enemy = np.array([[0.,0.,0.] for i in range(self.robot_num)])
+        difference_enemy = np.array([[0.,0.,0.] for i in range(self.enemy_num)])
         for i in range(self.robot_num):
             x_current, y_current, z_current = self.robot[i].get_current_position()
             x_future, y_future, z_future = self.robot[i].get_future_position()
@@ -268,6 +279,7 @@ class WorldModel():
     def update_from_vison(self, x):
         self.get_information_from_vision(x)
         self.who_has_a_ball()
+        # under construction
 
     def attack_or_defence(self):
         if self.which_has_a_ball == "robots":
@@ -283,9 +295,47 @@ class WorldModel():
             print("defence!")
             #None
 
+    def get_potential(self, x, y, robot_id):
+        U = 0.
+        x_goal, y_goal, _ = self.robot[robot_id].get_future_position()
+        for i in range(self.enemy_num):
+            x_enemy, y_enemy, _ = self.enemy[i].get_current_position()
+            U +=  (self.weight_enemy *  1.0) / math.sqrt((x - x_enemy)*(x - x_enemy) + (y - y_enemy)*(y - y_enemy))
+        U += (self.weight_goal * -1.0) / math.sqrt((x - x_goal + 1e-9)*(x - x_goal + 1e-9) + (y - y_goal + 1e-9)*(y - y_goal+1e-9));
+        return U
+
+    def move_by_potential_method(self, robot_id):
+        x_current, y_current, _ = self.robot[robot_id].get_current_position()
+        vx = - (self.get_potential(x_current + self.delta, y_current, robot_id) - self.get_potential(x_current, y_current, robot_id)) / self.delta
+        vy = - (self.get_potential(x_current, y_current + self.delta, robot_id) - self.get_potential(x_current, y_current, robot_id)) / self.delta
+        v = math.sqrt(vx * vx + vy * vy)
+
+        vx /= v/(self.speed * self.rate)
+        vy /= v/(self.speed * self.rate)
+
+        x_current += vx
+        y_current += vy
+        self.robot[robot_id].set_current_position(x_current, y_current, 0.)
+        #return vx,vy
 
 
 
+    def decision_making(self):
+        while True:
+            self.who_has_a_ball()
+            self.attack_or_defence()
+            self.decide_attack_strategy()
+            print("decision_making")
+            time.sleep(1)
+
+    def send_data(self):
+        while True:
+            print("send_data")
+            time.sleep(self.rate)
+
+    def get_vision_data(self):
+        while True:
+            time.sleep(1./60.)
 
 
 """
@@ -303,7 +353,7 @@ class SetPositions():
 
 
 if __name__ == "__main__":
-    a = WorldModel(robot_num=8)
+    a = WorldModel(robot_num=8, enemy_num=8)
     a.set_init_positions(char="robot")
     a.set_init_positions(char="enemy")
     a.set_init_positions(char="ball")
@@ -313,9 +363,21 @@ if __name__ == "__main__":
     #a.set_first_positions()
     #a.robot_move_all_linear()
     #a.space_clustering()
-    a.who_has_a_ball()
-    a.attack_or_defence()
-    a.decide_attack_strategy()
+    #a.who_has_a_ball()
+    #a.attack_or_defence()
+    #a.decide_attack_strategy()
+    #a.set_first_positions()
+    #a.show_positions_figure()
+    a.move_by_potential_method(robot_id=1)
+    #a.show_positions_figure()
+
+    thread_1 = threading.Thread(target=a.decision_making)
+    thread_2 = threading.Thread(target=a.send_data)
+    thread_1.start()
+    thread_2.start()
+
+
+
 
 
     ## thread化
