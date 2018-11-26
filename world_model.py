@@ -20,23 +20,55 @@ class WorldModel():
         self.robot = [entity.Robot() for i in range(robot_num)]
         self.enemy = [entity.Robot() for i in range(enemy_num)]
         self.ball = entity.Ball()
+
         self.field_x_size = 12000.
         self.field_y_size = 9000.
+        self.field_x_min = - self.field_x_size / 2.
+        self.field_x_max = self.field_x_size / 2.
+        self.field_y_min = - self.field_y_size / 2.
+        self.field_y_max = self.field_y_size / 2.
 
-        self.rate = 0.1 #s
+        self.goal_y_size = 1200.
+        self.goal_y_min = -self.goal_y_size / 2.
+        self.goal_y_max = self.goal_y_size / 2.
+
+        self.ball_dynamics_window = 10
+        self.ball_dynamics_x = [0. for i in range(self.ball_dynamics_window)]
+        self.ball_dynamics_y = [0. for i in range(self.ball_dynamics_window)]
+
+        self.goal_keeper_x = self.field_x_min + 20
+
+        # position
+        if self.robot_num == 8:
+            self.robot[0].position = "GK"
+            self.robot[1].position = "LCB"
+            self.robot[2].position = "RCB"
+            self.robot[3].position = "LSB"
+            self.robot[4].position = "RSB"
+            self.robot[5].position = "LMF"
+            self.robot[6].position = "RMF"
+        elif self.robot_num == 4:
+            self.robot[0].position = "GK"
+            self.robot[1].position = "LCB"
+            self.robot[2].position = "CCB"
+            self.robot[3].position = "RCB"
+
+        self.rate = 0.05 #s
 
         self.strategy = None
 
         self.referee = None
 
         self.which_has_a_ball = None
-        self.attack_or_deffence = None
+        self.attack_or_defence = None
 
         # weight for potential
         self.weight_enemy = 1.0
         self.weight_goal = 5.0
         self.delta = 0.1
         self.speed = self.robot[0].max_velocity
+
+        self.counter = 0
 
     def get_information_from_vision(self, x):
         self.robot[0].set_current_position(x=-3000., y=0., theta=0.)
@@ -121,7 +153,7 @@ class WorldModel():
         plt.ylim(-self.field_y_size/2, self.field_y_size/2)
         plt.show()
 
-
+    """
     def set_positions_figure(self, plot_num=1):
         if plot_num == 1:
             for robot in self.robot:
@@ -131,6 +163,7 @@ class WorldModel():
             plt.xlim(-self.field_x_size/2, self.field_x_size/2)
             plt.ylim(-self.field_y_size/2, self.field_y_size/2)
             plt.show()
+    """
 
     def robot_collision_detect(self):
         robot = self.robot + self.enemy
@@ -200,10 +233,6 @@ class WorldModel():
             self.robot_collision_detect()
             #self.show_positions_figure()
 
-
-
-    def robot_move_individual_linear(self, rate, num):
-        None
 
     def create_mesh(self):
         self.mesh_size = 50
@@ -275,6 +304,8 @@ class WorldModel():
             self.which_has_a_ball = "robots"
         elif flag == -1:
             self.which_has_a_ball = "enemy"
+        else:
+            self.which_has_a_ball = "free"
 
     def update_from_vison(self, x):
         self.get_information_from_vision(x)
@@ -283,41 +314,85 @@ class WorldModel():
 
     def attack_or_defence(self):
         if self.which_has_a_ball == "robots":
-            self.attack_or_deffence = "attack"
+            self.attack_or_defence = "attack"
         else:
-            self.attack_or_deffence = "deffence"
+            self.attack_or_defence = "defence"
 
     def decide_attack_strategy(self):
-        if self.attack_or_deffence == "attack":
+        if self.attack_or_defence == "attack":
             #self.space_clustering(
             print("attack!")
         else:
             print("defence!")
             #None
 
-    def get_potential(self, x, y, robot_id):
+    def get_potential(self, x, y, x_goal, y_goal):
         U = 0.
-        x_goal, y_goal, _ = self.robot[robot_id].get_future_position()
         for i in range(self.enemy_num):
             x_enemy, y_enemy, _ = self.enemy[i].get_current_position()
-            U +=  (self.weight_enemy *  1.0) / math.sqrt((x - x_enemy)*(x - x_enemy) + (y - y_enemy)*(y - y_enemy))
-        U += (self.weight_goal * -1.0) / math.sqrt((x - x_goal + 1e-9)*(x - x_goal + 1e-9) + (y - y_goal + 1e-9)*(y - y_goal+1e-9));
+            U +=  (self.weight_enemy *  1.0) / math.sqrt((x - x_enemy + 0.00001)*(x - x_enemy + 0.00001) + (y - y_enemy + 0.00001)*(y - y_enemy + 0.00001))
+        U += (self.weight_goal * -1.0) / math.sqrt((x - x_goal + 0.00001)*(x - x_goal + 0.00001) + (y - y_goal + 0.00001)*(y - y_goal + 0.00001));
         return U
 
-    def move_by_potential_method(self, robot_id):
-        x_current, y_current, _ = self.robot[robot_id].get_current_position()
-        vx = - (self.get_potential(x_current + self.delta, y_current, robot_id) - self.get_potential(x_current, y_current, robot_id)) / self.delta
-        vy = - (self.get_potential(x_current, y_current + self.delta, robot_id) - self.get_potential(x_current, y_current, robot_id)) / self.delta
-        v = math.sqrt(vx * vx + vy * vy)
+    def move_by_potential_method(self):
+        v_all = np.zeros([self.robot_num, 2])
+        for i in range(self.robot_num):
+            x_goal, y_goal, _ = self.robot[i].get_future_position()
+            x_current, y_current, _ = self.robot[i].get_current_position()
+            vx = - (self.get_potential(x_current + self.delta, y_current, x_goal, y_goal) - self.get_potential(x_current, y_current, x_goal, y_goal)) / self.delta
+            vy = - (self.get_potential(x_current, y_current + self.delta, x_goal, y_goal) - self.get_potential(x_current, y_current, x_goal, y_goal)) / self.delta
+            v = math.sqrt(vx * vx + vy * vy)
+            vx /= v/(self.speed * self.rate)
+            vy /= v/(self.speed * self.rate)
 
-        vx /= v/(self.speed * self.rate)
-        vy /= v/(self.speed * self.rate)
+            if vx * vx + vy * vy < (x_goal - x_current) ** 2 + (y_goal - y_current) ** 2:
+                x_current += vx
+                y_current += vy
+                self.robot[i].set_current_position(x_current, y_current, 0.)
+            else:
+                vx = x_goal - x_current
+                vy = y_goal - y_current
+                self.robot[i].set_current_position(x_goal, y_goal, 0.)
+            v_all[i][0] = vx
+            v_all[i][1] = vy
+        self.counter += 1
+        print(self.counter, ":", v_all)
 
-        x_current += vx
-        y_current += vy
-        self.robot[robot_id].set_current_position(x_current, y_current, 0.)
-        #return vx,vy
 
+    def ball_liner_fitting(self):
+        x = [0.,1., 2., 3., 4., 5., 6., 7., 8., 9.]
+        self.ball_dynamics_x = [0.,1., 2., 3., 4., 5., 6., 7., 8., 9.]
+        self.ball_dynamics_y = [10. * x[i] + 12. for i in range(10)]
+
+        array_x = np.array(self.ball_dynamics_x)
+        array_y = np.array(self.ball_dynamics_y)
+
+        random = np.array([np.random.normal(1., 5.) for i in range(10)])
+        array_x + random
+        random = np.array([np.random.normal(1., 5.) for i in range(10)])
+        array_y + random
+
+        n = self.ball_dynamics_window
+        xy_sum = np.dot(array_x, array_y)
+        x_sum = np.sum(array_x)
+        y_sum = np.sum(array_y)
+        x_square_sum = np.dot(array_x, array_x)
+        a = (n * xy_sum - x_sum * y_sum) / (n * x_square_sum - (x_sum ** 2))
+        b = (x_square_sum * y_sum - xy_sum * x_sum) / (n * x_square_sum - x_sum ** 2)
+        return a,b
+
+    def goal_keeper_strategy(self):
+        a, b = self.ball_liner_fitting()
+        y = a * self.goal_keeper_x + b
+        if y > self.goal_y_min and y < self.goal_y_max:
+            self.robot[0].set_future_position(self.goal_keeper_x, y, 0.)
+
+    def defender_strategy(self):
+        None
+
+    def defence_strategy(self):
+        self.goal_keeper_strategy()
+        if self.who_has_a_ball == "free":
 
 
     def decision_making(self):
@@ -325,17 +400,27 @@ class WorldModel():
             self.who_has_a_ball()
             self.attack_or_defence()
             self.decide_attack_strategy()
+            if self.attack_or_defence == "attack":
+                None
+            elif self.attack_or_defence == "defence":
+                self.defence_strategy()
             print("decision_making")
-            time.sleep(1)
+            time.sleep(0.1)
 
     def send_data(self):
         while True:
+            self.move_by_potential_method()
             print("send_data")
             time.sleep(self.rate)
 
     def get_vision_data(self):
         while True:
+            del self.ball_dynamics[0]
+            self.ball_dynamics.append([x, y])
             time.sleep(1./60.)
+            print("get_data")
+
+
 
 
 """
@@ -360,7 +445,8 @@ if __name__ == "__main__":
     #a.show_positions_figure()
     a.robot_enemy_move_all_linear()
     #a.robot_collision_detect()
-    #a.set_first_positions()
+    a.set_first_positions()
+    a.defence_strategy()
     #a.robot_move_all_linear()
     #a.space_clustering()
     #a.who_has_a_ball()
@@ -368,13 +454,13 @@ if __name__ == "__main__":
     #a.decide_attack_strategy()
     #a.set_first_positions()
     #a.show_positions_figure()
-    a.move_by_potential_method(robot_id=1)
+    #a.move_by_potential_method()
     #a.show_positions_figure()
 
-    thread_1 = threading.Thread(target=a.decision_making)
-    thread_2 = threading.Thread(target=a.send_data)
-    thread_1.start()
-    thread_2.start()
+    #thread_1 = threading.Thread(target=a.decision_making)
+    #thread_2 = threading.Thread(target=a.send_data)
+    #thread_1.start()
+    #thread_2.start()
 
 
 

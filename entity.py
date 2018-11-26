@@ -33,11 +33,12 @@ class Robot(Entity):
         super().__init__()
         self.size_r = 90.
         self.front_degree = 11.86 * 2
-        self.max_velocity = 1000. #mm/s
+        self.max_velocity = 2000. #mm/s
         self.future_position_x = 0.
         self.future_position_y = 0.
         self.future_orientation = 0.
         self.has_a_ball = False
+        self.position = ""
 
     def set_future_position(self, x, y, theta):
         self.future_position_x = x
