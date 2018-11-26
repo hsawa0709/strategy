@@ -39,6 +39,7 @@ class Robot(Entity):
         self.future_orientation = 0.
         self.has_a_ball = False
         self.position = ""
+        self.max_acceleration = 1000.
 
     def set_future_position(self, x, y, theta):
         self.future_position_x = x

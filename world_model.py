@@ -52,6 +52,12 @@ class WorldModel():
             self.robot[1].position = "LCB"
             self.robot[2].position = "CCB"
             self.robot[3].position = "RCB"
+        elif self.robot_num == 5:
+            self.robot[0].position = "GK"
+            self.robot[1].position = "LCB"
+            self.robot[2].position = "CCB"
+            self.robot[3].position = "RCB"
+            self.robot[4].position = "CF"
 
         self.rate = 0.05 #s
 
@@ -360,7 +366,7 @@ class WorldModel():
 
 
     def ball_liner_fitting(self):
-        x = [0.,1., 2., 3., 4., 5., 6., 7., 8., 9.]
+        x = [0.,1.2, 2.1, 3.4, 4.6, 5.1, 6.2, 7.5, 8.54, 9.1]
         self.ball_dynamics_x = [0.,1., 2., 3., 4., 5., 6., 7., 8., 9.]
         self.ball_dynamics_y = [10. * x[i] + 12. for i in range(10)]
 
@@ -379,21 +385,62 @@ class WorldModel():
         x_square_sum = np.dot(array_x, array_x)
         a = (n * xy_sum - x_sum * y_sum) / (n * x_square_sum - (x_sum ** 2))
         b = (x_square_sum * y_sum - xy_sum * x_sum) / (n * x_square_sum - x_sum ** 2)
-        return a,b
+        _error = a * array_x + b - array_y
+        error = np.dot(_error, _error)
+        return a, b, error
 
     def goal_keeper_strategy(self):
-        a, b = self.ball_liner_fitting()
+        a, b, error = self.ball_liner_fitting()
+        print(error)
         y = a * self.goal_keeper_x + b
         if y > self.goal_y_min and y < self.goal_y_max:
             self.robot[0].set_future_position(self.goal_keeper_x, y, 0.)
 
+    def calculate_goal_ball_linear_distance(self):
+        x_ball = self.ball_dynamics_x[self.ball_dynamics_window-1]
+        y_ball = self.ball_dynamics_y[self.ball_dynamics_window-1]
+        x_ball = -1125.
+        y_ball = 313.
+        a_max = (self.goal_y_max - y_ball) / (self.field_x_min - x_ball)
+        b_max = (self.field_x_min * y_ball - x_ball * self.goal_y_min) / (self.field_x_min - x_ball)
+        a_mid = (0. - y_ball) / (self.field_x_min - x_ball)
+        b_mid = (self.field_x_min * y_ball - x_ball * 0.) / (self.field_x_min - x_ball)
+        a_min = (self.goal_y_min - y_ball) / (self.field_x_min - x_ball)
+        b_min = (self.field_x_min * y_ball - x_ball * self.goal_y_min) / (self.field_x_min - x_ball)
+        print(x_ball, y_ball)
+        return a_max, b_max, a_mid, b_mid, a_min, b_min
+
+    def center_back_strategy(self):
+        # x座標は常にself.field_x_min + 2000
+        _, _, a_mid, b_mid, _, _ = self.calculate_goal_ball_linear_distance()
+        x = self.field_x_min + 2000.
+        y_1 = a_mid * x + b_mid + 200.
+        y_2 = a_mid * x + b_mid - 200.
+        print(y_1, y_2)
+        self.robot[1].set_future_position(x, y_1, 0.)
+        self.robot[2].set_future_position(x, y_2, 0.)
+
+    def about_taking_time(self, robot_id, x_start, y_start, x_goal, y_goal):
+        v_max = self.robot[robot_id].max_velocity
+        a_max = self.robot[robot_id].max_acceleration
+        distance = np.sqrt((x_start - x_goal)**2 + (y_start - y_goal)**2)
+        if distance < v_max ** 2 / (2 * a_max):
+            t = np.sqrt(2*distance / a_max)
+        else:
+            t = distance / v_max + v_max / (2*a_max)
+        return t
+
+
     def defender_strategy(self):
+        None
+
+    def defence_defender_strategy(self):
         None
 
     def defence_strategy(self):
         self.goal_keeper_strategy()
         if self.who_has_a_ball == "free":
-
+            None
 
     def decision_making(self):
         while True:
@@ -447,6 +494,7 @@ if __name__ == "__main__":
     #a.robot_collision_detect()
     a.set_first_positions()
     a.defence_strategy()
+    a.center_back_strategy()
     #a.robot_move_all_linear()
     #a.space_clustering()
     #a.who_has_a_ball()
